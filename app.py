@@ -38,7 +38,7 @@ HTML = """
         <div class="bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 p-6 md:p-8 text-center shadow-lg">
             <h1 class="text-3xl md:text-4xl font-extrabold tracking-tight text-white mb-2">❤️ Heart Failure Prediction Portal</h1>
             <p class="text-indigo-100 max-w-xl mx-auto text-sm md:text-base font-medium">
-                Advanced Clinical Analytics Dashboard &bull; Developed by Pranita
+                Advanced Clinical Analytics Dashboard &bull; Developed by Yogita Dokh
             </p>
         </div>
 
