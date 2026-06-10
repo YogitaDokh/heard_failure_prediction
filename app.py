@@ -1,205 +1,163 @@
-from flask import Flask, request, render_template_string
+import os
 import pickle
 import numpy as np
+import pandas as pd
+from flask import Flask, request, render_template_string
 
 app = Flask(__name__)
 
-# Load Model
-with open("LR_model.pkl", "rb") as f:
-    model = pickle.load(f)
+# Define the path to your model file
+MODEL_PATH = os.path.join(os.path.dirname(__file__), 'LR_model.pkl')
+
+# Load the model directly from the physical file
+if os.path.exists(MODEL_PATH):
+    with open(MODEL_PATH, 'rb') as f:
+        model = pickle.load(f)
+else:
+    raise FileNotFoundError(f"Could not find the model file at: {MODEL_PATH}. Ensure LR_model.pkl is uploaded to your repository root.")
+
+# Explicit feature list matching your scikit-learn model schema to prevent feature name warnings
+FEATURES = [
+    'age', 'anaemia', 'creatinine_phosphokinase', 'diabetes', 
+    'ejection_fraction', 'high_blood_pressure', 'platelets', 
+    'serum_creatinine', 'serum_sodium', 'sex', 'smoking', 'time'
+]
 
 HTML = """
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-<title>Heart Failure Prediction</title>
-
-<meta name="viewport" content="width=device-width, initial-scale=1">
-
-<style>
-
-*{
-margin:0;
-padding:0;
-box-sizing:border-box;
-font-family:Segoe UI,sans-serif;
-}
-
-body{
-background:linear-gradient(135deg,#0f172a,#1e3a8a);
-min-height:100vh;
-display:flex;
-justify-content:center;
-align-items:center;
-padding:20px;
-}
-
-.container{
-width:100%;
-max-width:1100px;
-background:white;
-padding:35px;
-border-radius:20px;
-box-shadow:0 10px 30px rgba(0,0,0,0.3);
-}
-
-h1{
-text-align:center;
-color:#1e3a8a;
-margin-bottom:10px;
-}
-
-.subtitle{
-text-align:center;
-margin-bottom:30px;
-color:#64748b;
-}
-
-.form-grid{
-display:grid;
-grid-template-columns:1fr 1fr;
-gap:15px;
-}
-
-input,select{
-width:100%;
-padding:12px;
-border:1px solid #cbd5e1;
-border-radius:10px;
-font-size:15px;
-}
-
-button{
-width:100%;
-margin-top:20px;
-padding:14px;
-background:#2563eb;
-color:white;
-border:none;
-border-radius:10px;
-font-size:18px;
-font-weight:bold;
-cursor:pointer;
-}
-
-button:hover{
-background:#1d4ed8;
-}
-
-.result{
-margin-top:25px;
-padding:20px;
-border-radius:12px;
-text-align:center;
-font-size:22px;
-font-weight:bold;
-}
-
-.success{
-background:#dcfce7;
-color:#15803d;
-}
-
-.danger{
-background:#fee2e2;
-color:#dc2626;
-}
-
-.footer{
-margin-top:25px;
-text-align:center;
-color:#64748b;
-}
-
-@media(max-width:768px){
-.form-grid{
-grid-template-columns:1fr;
-}
-}
-
-</style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Heart Failure Prediction System</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
 </head>
+<body class="bg-slate-900 text-slate-100 font-sans min-h-screen flex items-center justify-center p-4 md:p-8">
 
-<body>
+    <div class="max-w-4xl w-full bg-slate-800 rounded-2xl shadow-2xl border border-slate-700/50 overflow-hidden">
+        <div class="bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 p-6 md:p-8 text-center shadow-lg">
+            <h1 class="text-3xl md:text-4xl font-extrabold tracking-tight text-white mb-2">❤️ Heart Failure Prediction Portal</h1>
+            <p class="text-indigo-100 max-w-xl mx-auto text-sm md:text-base font-medium">
+                Advanced Clinical Analytics Dashboard &bull; Developed by Pranita
+            </p>
+        </div>
 
-<div class="container">
+        <form method="POST" class="p-6 md:p-8 space-y-8">
+            
+            <div>
+                <h2 class="text-lg font-bold text-indigo-400 mb-4 flex items-center gap-2">
+                    <span class="w-2 h-5 bg-indigo-500 rounded-full"></span>
+                    Clinical & Laboratory Measurements
+                </h2>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
+                    <div>
+                        <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2">CPK Level (mcg/L)</label>
+                        <input type="number" step="0.01" name="creatinine_phosphokinase" value="{{ request.form['creatinine_phosphokinase'] if request.method == 'POST' else '250' }}" required class="w-full bg-slate-900/50 text-white px-4 py-2.5 rounded-xl border border-slate-700 focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 transition outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2">Ejection Fraction (%)</label>
+                        <input type="number" step="0.01" name="ejection_fraction" min="1" max="100" value="{{ request.form['ejection_fraction'] if request.method == 'POST' else '38' }}" required class="w-full bg-slate-900/50 text-white px-4 py-2.5 rounded-xl border border-slate-700 focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 transition outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2">Platelets (kiloplatelets/mL)</label>
+                        <input type="number" step="0.01" name="platelets" value="{{ request.form['platelets'] if request.method == 'POST' else '263358' }}" required class="w-full bg-slate-900/50 text-white px-4 py-2.5 rounded-xl border border-slate-700 focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 transition outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2">Serum Creatinine (mg/dL)</label>
+                        <input type="number" step="0.01" name="serum_creatinine" value="{{ request.form['serum_creatinine'] if request.method == 'POST' else '1.1' }}" required class="w-full bg-slate-900/50 text-white px-4 py-2.5 rounded-xl border border-slate-700 focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 transition outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2">Serum Sodium (mEq/L)</label>
+                        <input type="number" step="0.01" name="serum_sodium" value="{{ request.form['serum_sodium'] if request.method == 'POST' else '137' }}" required class="w-full bg-slate-900/50 text-white px-4 py-2.5 rounded-xl border border-slate-700 focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 transition outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2">Follow-up Period (Days)</label>
+                        <input type="number" step="0.01" name="time" value="{{ request.form['time'] if request.method == 'POST' else '130' }}" required class="w-full bg-slate-900/50 text-white px-4 py-2.5 rounded-xl border border-slate-700 focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 transition outline-none">
+                    </div>
+                </div>
+            </div>
 
-<h1>❤️ Heart Failure Prediction System</h1>
+            <div>
+                <h2 class="text-lg font-bold text-purple-400 mb-4 flex items-center gap-2">
+                    <span class="w-2 h-5 bg-purple-500 rounded-full"></span>
+                    Demographics & Patient History
+                </h2>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-5 bg-slate-900/30 p-4 rounded-xl border border-slate-700/30">
+                    <div>
+                        <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2">Age</label>
+                        <input type="number" step="0.01" name="age" min="1" max="120" value="{{ request.form['age'] if request.method == 'POST' else '60' }}" required class="w-full bg-slate-900 text-white px-4 py-2 rounded-xl border border-slate-700 focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500 transition outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold tracking-wider text-slate-400 mb-2">Sex</label>
+                        <select name="sex" class="w-full bg-slate-900 text-white px-3 py-2 rounded-xl border border-slate-700 focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500 transition outline-none">
+                            <option value="1" {% if request.form['sex'] == '1' %}selected{% endif %}>Male</option>
+                            <option value="0" {% if request.form['sex'] == '0' %}selected{% endif %}>Female</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold tracking-wider text-slate-400 mb-2">Anaemia Status</label>
+                        <select name="anaemia" class="w-full bg-slate-900 text-white px-3 py-2 rounded-xl border border-slate-700 focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500 transition outline-none">
+                            <option value="0" {% if request.form['anaemia'] == '0' %}selected{% endif %}>No Anaemia</option>
+                            <option value="1" {% if request.form['anaemia'] == '1' %}selected{% endif %}>Anaemia Present</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold tracking-wider text-slate-400 mb-2">Diabetes Status</label>
+                        <select name="diabetes" class="w-full bg-slate-900 text-white px-3 py-2 rounded-xl border border-slate-700 focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500 transition outline-none">
+                            <option value="0" {% if request.form['diabetes'] == '0' %}selected{% endif %}>No Diabetes</option>
+                            <option value="1" {% if request.form['diabetes'] == '1' %}selected{% endif %}>Diabetes Present</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold tracking-wider text-slate-400 mb-2">Blood Pressure</label>
+                        <select name="high_blood_pressure" class="w-full bg-slate-900 text-white px-3 py-2 rounded-xl border border-slate-700 focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500 transition outline-none">
+                            <option value="0" {% if request.form['high_blood_pressure'] == '0' %}selected{% endif %}>Normal Blood Pressure</option>
+                            <option value="1" {% if request.form['high_blood_pressure'] == '1' %}selected{% endif %}>High Blood Pressure</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold tracking-wider text-slate-400 mb-2">Smoking Status</label>
+                        <select name="smoking" class="w-full bg-slate-900 text-white px-3 py-2 rounded-xl border border-slate-700 focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500 transition outline-none">
+                            <option value="0" {% if request.form['smoking'] == '0' %}selected{% endif %}>Non Smoker</option>
+                            <option value="1" {% if request.form['smoking'] == '1' %}selected{% endif %}>Smoker</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
 
-<p class="subtitle">
-Machine Learning using Logistic Regression
-</p>
+            <div class="flex justify-center pt-4">
+                <button type="submit" class="w-full md:w-auto px-10 py-3.5 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-bold rounded-xl transition shadow-lg shadow-indigo-900/40 cursor-pointer text-lg tracking-wide transform hover:-translate-y-0.5 active:translate-y-0">
+                    Run Diagnostic Assessment
+                </button>
+            </div>
+        </form>
 
-<form method="POST">
+        {% if prediction %}
+        <div class="border-t border-slate-700/50 bg-slate-900/40 p-6 md:p-8 text-center">
+            {% if css_class == 'danger' %}
+            <div class="inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider mb-3 bg-rose-500/10 text-rose-400 border border-rose-500/20">
+                High Risk Class Assigned
+            </div>
+            <h3 class="text-2xl font-black text-rose-500 tracking-tight">{{ prediction }}</h3>
+            <p class="text-slate-400 text-sm mt-2 max-w-lg mx-auto">
+                The evaluation criteria generated metrics crossing critical classification thresholds. Immediate clinical evaluation is recommended.
+            </p>
+            {% else %}
+            <div class="inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider mb-3 bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                Baseline Risk Class Assigned
+            </div>
+            <h3 class="text-2xl font-black text-emerald-400 tracking-tight">{{ prediction }}</h3>
+            <p class="text-slate-400 text-sm mt-2 max-w-lg mx-auto">
+                The diagnostic verification confirms that current operational tracking scores are well positioned inside standard statistical safe limits.
+            </p>
+            {% endif %}
+        </div>
+        {% endif %}
 
-<div class="form-grid">
-
-<input type="number" step="0.01" name="age" placeholder="Age" required>
-
-<select name="anaemia">
-<option value="0">No Anaemia</option>
-<option value="1">Anaemia</option>
-</select>
-
-<input type="number" step="0.01" name="creatinine_phosphokinase"
-placeholder="Creatinine Phosphokinase" required>
-
-<select name="diabetes">
-<option value="0">No Diabetes</option>
-<option value="1">Diabetes</option>
-</select>
-
-<input type="number" step="0.01" name="ejection_fraction"
-placeholder="Ejection Fraction" required>
-
-<select name="high_blood_pressure">
-<option value="0">Normal Blood Pressure</option>
-<option value="1">High Blood Pressure</option>
-</select>
-
-<input type="number" step="0.01" name="platelets"
-placeholder="Platelets" required>
-
-<input type="number" step="0.01" name="serum_creatinine"
-placeholder="Serum Creatinine" required>
-
-<input type="number" step="0.01" name="serum_sodium"
-placeholder="Serum Sodium" required>
-
-<select name="sex">
-<option value="1">Male</option>
-<option value="0">Female</option>
-</select>
-
-<select name="smoking">
-<option value="0">Non Smoker</option>
-<option value="1">Smoker</option>
-</select>
-
-<input type="number" step="0.01" name="time"
-placeholder="Follow-up Time" required>
-
-</div>
-
-<button type="submit">
-Predict Heart Failure Risk
-</button>
-
-</form>
-
-{% if prediction %}
-
-<div class="result {{ css_class }}">
-{{ prediction }}
-</div>
-
-{% endif %}
-
-<div class="footer">
-Developed by Pranita | Data Analyst & Machine Learning Project
-</div>
-
-</div>
+        <div class="bg-slate-900/60 text-center py-4 border-t border-slate-800 text-xs font-medium text-slate-500 tracking-wider uppercase">
+            Data Analyst & Machine Learning Project Operations
+        </div>
+    </div>
 
 </body>
 </html>
@@ -207,13 +165,11 @@ Developed by Pranita | Data Analyst & Machine Learning Project
 
 @app.route("/", methods=["GET", "POST"])
 def home():
-
     prediction = None
     css_class = ""
 
     if request.method == "POST":
-
-        features = np.array([[
+        raw_features = [
             float(request.form["age"]),
             float(request.form["anaemia"]),
             float(request.form["creatinine_phosphokinase"]),
@@ -226,15 +182,17 @@ def home():
             float(request.form["sex"]),
             float(request.form["smoking"]),
             float(request.form["time"])
-        ]])
+        ]
 
-        pred = model.predict(features)[0]
+        # Use DataFrame mapping with matched features list to keep scikit-learn warnings out of Render logs
+        input_df = pd.DataFrame([raw_features], columns=FEATURES)
+        pred = model.predict(input_df)[0]
 
         if pred == 1:
-            prediction = "⚠️ High Risk of Heart Failure"
+            prediction = "⚠️ High Risk of Heart Failure Event"
             css_class = "danger"
         else:
-            prediction = "✅ Low Risk of Heart Failure"
+            prediction = "✅ Low Risk Profile Maintained"
             css_class = "success"
 
     return render_template_string(
@@ -244,4 +202,5 @@ def home():
     )
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port)
