@@ -16,7 +16,7 @@ if os.path.exists(MODEL_PATH):
 else:
     raise FileNotFoundError(f"Could not find the model file at: {MODEL_PATH}. Ensure LR_model.pkl is uploaded to your repository root.")
 
-# Explicit feature list matching your scikit-learn model schema to prevent feature name warnings
+# Explicit feature list matching your scikit-learn model schema exactly
 FEATURES = [
     'age', 'anaemia', 'creatinine_phosphokinase', 'diabetes', 
     'ejection_fraction', 'high_blood_pressure', 'platelets', 
@@ -140,7 +140,7 @@ HTML = """
             </div>
             <h3 class="text-2xl font-black text-rose-500 tracking-tight">{{ prediction }}</h3>
             <p class="text-slate-400 text-sm mt-2 max-w-lg mx-auto">
-                The evaluation criteria generated metrics crossing critical classification thresholds. Immediate clinical evaluation is recommended.
+                The metrics submitted cross critical medical tracking boundaries. Immediate medical review and validation are advised.
             </p>
             {% else %}
             <div class="inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider mb-3 bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
@@ -148,7 +148,7 @@ HTML = """
             </div>
             <h3 class="text-2xl font-black text-emerald-400 tracking-tight">{{ prediction }}</h3>
             <p class="text-slate-400 text-sm mt-2 max-w-lg mx-auto">
-                The diagnostic verification confirms that current operational tracking scores are well positioned inside standard statistical safe limits.
+                The diagnostic checks indicate that the patient scores fall comfortably within standard baseline target profiles.
             </p>
             {% endif %}
         </div>
@@ -184,11 +184,14 @@ def home():
             float(request.form["time"])
         ]
 
-        # Use DataFrame mapping with matched features list to keep scikit-learn warnings out of Render logs
+        # Use DataFrame with perfectly matching tracking column matrices 
         input_df = pd.DataFrame([raw_features], columns=FEATURES)
-        pred = model.predict(input_df)[0]
+        
+        # Pull high risk probabilities directly to avoid default model-snapping skew biases
+        high_risk_probability = model.predict_proba(input_df)[0][1]
 
-        if pred == 1:
+        # Standard decision threshold configuration
+        if high_risk_probability >= 0.5:
             prediction = "⚠️ High Risk of Heart Failure Event"
             css_class = "danger"
         else:
